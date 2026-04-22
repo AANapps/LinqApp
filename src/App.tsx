@@ -323,10 +323,8 @@ export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [needsRoleSelection, setNeedsRoleSelection] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<'consumer' | 'vendor' | null>(null);
   const [profileCollection, setProfileCollection] = useState<'users' | 'vendors' | null>(null);
   const [activeTab, setActiveTab] = useState<string>('for-you');
   const [viewingStore, setViewingStore] = useState<StoreProfile | null>(null);
@@ -613,9 +611,7 @@ export default function App() {
         setUser(null);
         setProfile(null);
         setProfileCollection(null);
-        setSelectedRole(null);
         setNeedsEmailVerification(false);
-        setNeedsRoleSelection(false);
         setNeedsOnboarding(false);
         setLoading(false);
         return;
@@ -627,7 +623,6 @@ export default function App() {
         const isEmailProvider = firebaseUser.providerData.some(p => p.providerId === 'password');
         if (isEmailProvider && !firebaseUser.emailVerified) {
           setNeedsEmailVerification(true);
-          setNeedsRoleSelection(false);
           setNeedsOnboarding(false);
           setLoading(false);
           return;
@@ -639,20 +634,16 @@ export default function App() {
         const existingDoc = inUsers ? userDoc : await getDoc(doc(db, 'vendors', firebaseUser.uid));
 
         if (!existingDoc.exists()) {
-          setNeedsRoleSelection(true);
-          setNeedsOnboarding(false);
+          setNeedsOnboarding(true);
           setProfile(null);
         } else {
           const data = existingDoc.data();
-          setSelectedRole(data.role as 'consumer' | 'vendor');
           setProfileCollection(inUsers ? 'users' : 'vendors');
           setProfile(data as UserProfile);
-          setNeedsRoleSelection(false);
-          setNeedsOnboarding(data.roleConfirmed === true && !data.onboardingComplete);
+          setNeedsOnboarding(!data.onboardingComplete);
         }
       } catch (err) {
         console.error('Auth check failed:', err);
-        setNeedsRoleSelection(false);
         setNeedsOnboarding(false);
       } finally {
         setLoading(false);
@@ -682,15 +673,12 @@ export default function App() {
         const inUsers = userDoc.exists();
         const existingDoc = inUsers ? userDoc : await getDoc(doc(db, 'vendors', refreshed.uid));
         if (!existingDoc.exists()) {
-          setNeedsRoleSelection(true);
+          setNeedsOnboarding(true);
         } else {
           const data = existingDoc.data();
-          setSelectedRole(data.role as 'consumer' | 'vendor');
           setProfileCollection(inUsers ? 'users' : 'vendors');
           setProfile(data as UserProfile);
-          if (data.roleConfirmed === true && !data.onboardingComplete) {
-            setNeedsOnboarding(true);
-          }
+          setNeedsOnboarding(!data.onboardingComplete);
         }
       })
       .catch((err) => {
@@ -754,15 +742,12 @@ export default function App() {
       const inUsers = userDoc.exists();
       const existingDoc = inUsers ? userDoc : await getDoc(doc(db, 'vendors', refreshed.uid));
       if (!existingDoc.exists()) {
-        setNeedsRoleSelection(true);
+        setNeedsOnboarding(true);
       } else {
         const data = existingDoc.data();
-        setSelectedRole(data.role as 'consumer' | 'vendor');
         setProfileCollection(inUsers ? 'users' : 'vendors');
         setProfile(data as UserProfile);
-        if (data.roleConfirmed === true && !data.onboardingComplete) {
-          setNeedsOnboarding(true);
-        }
+        setNeedsOnboarding(!data.onboardingComplete);
       }
       return true;
     }
@@ -881,44 +866,37 @@ export default function App() {
     await signOut(auth);
   };
 
-  const handleRoleSelect = async (role: 'consumer' | 'vendor') => {
+  const handleOnboardingComplete = async (data: ConsumerOnboardingData | VendorOnboardingData) => {
     if (!user) return;
-    const collectionName = role === 'vendor' ? 'vendors' : 'users';
-    const profileRef = doc(db, collectionName, user.uid);
-    const existing = await getDoc(profileRef);
-    if (existing.exists()) {
-      await updateDoc(profileRef, { role, roleConfirmed: true });
-    } else {
-      await setDoc(profileRef, {
+    if (data.type === 'consumer') {
+      await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
-        name: user.displayName || 'Guest',
+        name: data.name,
+        handle: data.handle,
         email: user.email || '',
         photoURL: user.photoURL || '',
-        role,
-        roleConfirmed: true,
+        role: 'consumer',
+        onboardingComplete: true,
+        ...(data.gender ? { gender: data.gender } : {}),
+        ...(data.birthday ? { birthday: data.birthday } : {}),
+        ...(data.location ? { location: data.location } : {}),
         total_cards_held: 0,
         totalStamps: 0,
         totalRedeemed: 0
       });
-    }
-    setSelectedRole(role);
-    setProfileCollection(collectionName);
-    setNeedsRoleSelection(false);
-    setNeedsOnboarding(true);
-  };
-
-  const handleOnboardingComplete = async (data: ConsumerOnboardingData | VendorOnboardingData) => {
-    if (!user) return;
-    if (data.type === 'consumer') {
-      await updateDoc(doc(db, 'users', user.uid), {
-        name: data.name,
-        handle: data.handle,
-        ...(data.gender ? { gender: data.gender } : {}),
-        ...(data.birthday ? { birthday: data.birthday } : {}),
-        ...(data.location ? { location: data.location } : {}),
-        onboardingComplete: true
-      });
+      setProfileCollection('users');
     } else {
+      await setDoc(doc(db, 'vendors', user.uid), {
+        uid: user.uid,
+        name: user.displayName || data.businessName,
+        email: user.email || '',
+        photoURL: user.photoURL || '',
+        role: 'vendor',
+        onboardingComplete: true,
+        total_cards_held: 0,
+        totalStamps: 0,
+        totalRedeemed: 0
+      });
       await addDoc(collection(db, 'stores'), {
         name: data.businessName,
         category: data.category,
@@ -930,7 +908,7 @@ export default function App() {
         stamps_required_for_reward: 10,
         ...(data.location ? { lat: data.location.lat, lng: data.location.lng, location: data.location.city ?? '' } : {}),
       });
-      await updateDoc(doc(db, 'vendors', user.uid), { onboardingComplete: true });
+      setProfileCollection('vendors');
     }
     setNeedsOnboarding(false);
   };
@@ -956,12 +934,8 @@ export default function App() {
     return <EmailVerificationScreen user={user} onCheck={handleCheckVerification} onResend={handleResendVerification} onLogout={handleLogout} />;
   }
 
-  if (needsRoleSelection) {
-    return <RoleSelectionScreen user={user} onSelect={handleRoleSelect} />;
-  }
-
   if (needsOnboarding) {
-    return <OnboardingScreen user={user} role={selectedRole ?? 'consumer'} onComplete={handleOnboardingComplete} />;
+    return <OnboardingScreen user={user} onComplete={handleOnboardingComplete} />;
   }
 
   if (!profile) {
@@ -1412,59 +1386,6 @@ function EmailVerificationScreen({ user, onCheck, onResend, onLogout }: {
   );
 }
 
-function RoleSelectionScreen({ user, onSelect }: { user: FirebaseUser, onSelect: (role: 'consumer' | 'vendor') => void }) {
-  const [selecting, setSelecting] = React.useState<'consumer' | 'vendor' | null>(null);
-  const handle = async (role: 'consumer' | 'vendor') => {
-    setSelecting(role);
-    await onSelect(role);
-  };
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-8 text-center bg-brand-bg">
-      <div className="mb-8">
-        <div className="w-16 h-16 gradient-red rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-500/20">
-          <Sparkles className="w-8 h-8 text-white" />
-        </div>
-        <h1 className="font-display font-bold text-3xl text-brand-navy mb-2">Welcome to <span className="text-brand-gold">Li</span>nq</h1>
-        <p className="text-brand-navy/50 text-sm">How would you like to use Linq?</p>
-      </div>
-
-      <div className="w-full max-w-xs space-y-4">
-        <button
-          onClick={() => handle('consumer')}
-          disabled={selecting !== null}
-          className="w-full bg-white border-2 border-brand-navy/10 rounded-[2rem] p-6 text-left flex items-center gap-4 hover:border-brand-gold/40 hover:shadow-md transition-all active:scale-[0.98] disabled:opacity-60"
-        >
-          <div className="w-12 h-12 bg-brand-gold/10 rounded-2xl flex items-center justify-center shrink-0">
-            <Wallet className="w-6 h-6 text-brand-gold" />
-          </div>
-          <div>
-            <p className="font-bold text-brand-navy text-base">I'm a Customer</p>
-            <p className="text-xs text-brand-navy/40 mt-0.5">Collect stamps & earn rewards</p>
-          </div>
-          {selecting === 'consumer' && <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} className="ml-auto"><Sparkles className="w-5 h-5 text-brand-gold" /></motion.div>}
-        </button>
-
-        <button
-          onClick={() => handle('vendor')}
-          disabled={selecting !== null}
-          className="w-full bg-brand-navy rounded-[2rem] p-6 text-left flex items-center gap-4 hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-60"
-        >
-          <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center shrink-0">
-            <Building2 className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <p className="font-bold text-white text-base">I'm a Business</p>
-            <p className="text-xs text-white/50 mt-0.5">Run a loyalty programme</p>
-          </div>
-          {selecting === 'vendor' && <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} className="ml-auto"><Sparkles className="w-5 h-5 text-white" /></motion.div>}
-        </button>
-      </div>
-
-      <p className="text-xs text-brand-navy/30 mt-8">This cannot be changed after sign up</p>
-    </div>
-  );
-}
-
 function LocationStep({ locationData, locationStatus, onRequest }: {
   locationData: { lat: number; lng: number; city?: string } | null;
   locationStatus: 'idle' | 'requesting' | 'granted' | 'denied';
@@ -1510,15 +1431,14 @@ function LocationStep({ locationData, locationStatus, onRequest }: {
   );
 }
 
-function OnboardingScreen({ user, role, onComplete }: {
+function OnboardingScreen({ user, onComplete }: {
   user: FirebaseUser;
-  role: 'consumer' | 'vendor';
   onComplete: (data: ConsumerOnboardingData | VendorOnboardingData) => Promise<void>;
 }) {
+  const [role, setRole] = React.useState<'consumer' | 'vendor' | null>(null);
   const isVendor = role === 'vendor';
-  const STEPS = isVendor
-    ? ['name', 'category', 'contact', 'location'] as const
-    : ['identity', 'gender', 'birthday', 'location'] as const;
+  // Step 0 = role selection; steps 1-4 = role-specific details
+  const TOTAL_STEPS = 5;
 
   const [step, setStep] = React.useState(0);
   const [saving, setSaving] = React.useState(false);
@@ -1564,15 +1484,17 @@ function OnboardingScreen({ user, role, onComplete }: {
     );
   };
 
-  const canAdvance = isVendor
-    ? step === 0 ? businessName.trim().length > 0
-    : step === 1 ? !!category
-    : step === 2 ? address.trim().length > 0 && phone.trim().length > 0
-    : locationStatus === 'granted' || locationStatus === 'denied'
-    : step === 0 ? fullName.trim().length > 0 && handle.trim().length >= 3 && !handleError && !handleChecking
-    : step === 1 ? !!gender
-    : step === 2 ? !!birthday
-    : locationStatus === 'granted' || locationStatus === 'denied';
+  const canAdvance =
+    step === 0 ? role !== null
+    : isVendor
+      ? step === 1 ? businessName.trim().length > 0
+      : step === 2 ? !!category
+      : step === 3 ? address.trim().length > 0 && phone.trim().length > 0
+      : locationStatus === 'granted' || locationStatus === 'denied'
+    : step === 1 ? fullName.trim().length > 0 && handle.trim().length >= 3 && !handleError && !handleChecking
+      : step === 2 ? !!gender
+      : step === 3 ? !!birthday
+      : locationStatus === 'granted' || locationStatus === 'denied';
 
   const validateHandle = (val: string) => {
     const clean = val.toLowerCase().replace(/\s/g, '');
@@ -1792,12 +1714,51 @@ function OnboardingScreen({ user, role, onComplete }: {
     </>
   ];
 
-  const stepContent = isVendor ? vendorSteps : consumerSteps;
+  const roleStep = (
+    <>
+      <div className="w-14 h-14 gradient-red rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-500/20">
+        <Sparkles className="w-7 h-7 text-white" />
+      </div>
+      <h2 className="font-display font-bold text-2xl text-brand-navy mb-1">Welcome to <span className="text-brand-gold">Li</span>nq</h2>
+      <p className="text-sm text-brand-navy/40 mb-8">How would you like to use Linq?</p>
+      <div className="w-full space-y-4">
+        <button
+          onClick={() => setRole('consumer')}
+          className={`w-full rounded-[2rem] p-6 text-left flex items-center gap-4 transition-all active:scale-[0.98] border-2 ${role === 'consumer' ? 'bg-brand-gold/5 border-brand-gold shadow-md' : 'bg-white border-brand-navy/10 hover:border-brand-gold/40'}`}
+        >
+          <div className="w-12 h-12 bg-brand-gold/10 rounded-2xl flex items-center justify-center shrink-0">
+            <Wallet className="w-6 h-6 text-brand-gold" />
+          </div>
+          <div>
+            <p className="font-bold text-brand-navy text-base">I'm a Customer</p>
+            <p className="text-xs text-brand-navy/40 mt-0.5">Collect stamps & earn rewards</p>
+          </div>
+          {role === 'consumer' && <CheckCircle2 className="w-5 h-5 text-brand-gold ml-auto shrink-0" />}
+        </button>
+        <button
+          onClick={() => setRole('vendor')}
+          className={`w-full rounded-[2rem] p-6 text-left flex items-center gap-4 transition-all active:scale-[0.98] ${role === 'vendor' ? 'bg-brand-navy opacity-100' : 'bg-brand-navy opacity-80 hover:opacity-100'}`}
+        >
+          <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center shrink-0">
+            <Building2 className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <p className="font-bold text-white text-base">I'm a Business</p>
+            <p className="text-xs text-white/50 mt-0.5">Run a loyalty programme</p>
+          </div>
+          {role === 'vendor' && <CheckCircle2 className="w-5 h-5 text-white ml-auto shrink-0" />}
+        </button>
+      </div>
+    </>
+  );
+
+  const stepContent = [roleStep, ...(isVendor ? vendorSteps : consumerSteps)];
+  const isLastStep = step === TOTAL_STEPS - 1;
 
   return (
     <div className="min-h-screen flex flex-col bg-brand-bg px-8">
       <div className="flex items-center justify-center gap-2 pt-14 mb-10">
-        {STEPS.map((_, i) => (
+        {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
           <div
             key={i}
             className={`rounded-full transition-all ${i === step ? 'w-8 h-2 bg-brand-navy' : i < step ? 'w-2 h-2 bg-brand-navy/40' : 'w-2 h-2 bg-brand-navy/15'}`}
@@ -1823,7 +1784,7 @@ function OnboardingScreen({ user, role, onComplete }: {
       <div className="pb-12 max-w-xs mx-auto w-full space-y-3">
         <button
           onClick={() => {
-            if (step < STEPS.length - 1) setStep(s => s + 1);
+            if (!isLastStep) setStep(s => s + 1);
             else handleFinish();
           }}
           disabled={!canAdvance || saving}
@@ -1831,9 +1792,9 @@ function OnboardingScreen({ user, role, onComplete }: {
         >
           {saving
             ? <><motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}><Sparkles size={16} /></motion.div> Setting up…</>
-            : step < STEPS.length - 1 ? 'Continue' : isVendor ? 'Launch My Business' : 'Get Started'}
+            : !isLastStep ? 'Continue' : isVendor ? 'Launch My Business' : 'Get Started'}
         </button>
-        {step > 0 && step < STEPS.length - 1 && !isVendor && (
+        {step > 1 && !isLastStep && !isVendor && (
           <button onClick={() => setStep(s => s + 1)} className="w-full py-3 text-xs text-brand-navy/30 hover:text-brand-navy/50 transition-colors">
             Skip for now
           </button>
