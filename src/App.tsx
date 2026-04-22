@@ -1172,9 +1172,9 @@ function LandingPage({ onLogin, onEmailSignUp, onEmailSignIn }: {
         </motion.div>
         <div className="w-full max-w-xs space-y-3">
           {error && (
-            <div className="flex items-center gap-2 bg-red-900/40 border border-red-400/30 rounded-2xl px-4 py-3">
-              <AlertCircle size={14} className="text-red-300 shrink-0" />
-              <p className="text-red-200 text-xs">{error}</p>
+            <div className="flex items-center gap-2 bg-white/15 border border-white/25 rounded-2xl px-4 py-3">
+              <AlertCircle size={14} className="text-white/80 shrink-0" />
+              <p className="text-white/80 text-xs">{error}</p>
             </div>
           )}
           <button
@@ -1271,9 +1271,9 @@ function LandingPage({ onLogin, onEmailSignUp, onEmailSignIn }: {
           )}
 
           {error && (
-            <div className="flex items-center gap-2 bg-red-900/40 border border-red-400/30 rounded-2xl px-4 py-3">
-              <AlertCircle size={14} className="text-red-300 shrink-0" />
-              <p className="text-red-200 text-xs">{error}</p>
+            <div className="flex items-center gap-2 bg-white/15 border border-white/25 rounded-2xl px-4 py-3">
+              <AlertCircle size={14} className="text-white/80 shrink-0" />
+              <p className="text-white/80 text-xs">{error}</p>
             </div>
           )}
 
