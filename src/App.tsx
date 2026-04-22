@@ -954,7 +954,7 @@ export default function App() {
       <header className="glass-panel sticky top-0 z-50 px-5 py-3.5 flex items-center justify-between">
         <button
           onClick={() => setShowCreatePost(true)}
-          className="w-9 h-9 gradient-red rounded-xl flex items-center justify-center shadow-md shadow-red-500/20 active:scale-95 transition-transform"
+          className="w-9 h-9 gradient-red rounded-xl flex items-center justify-center shadow-md shadow-blue-500/20 active:scale-95 transition-transform"
         >
           <Plus className="w-5 h-5 text-white" />
         </button>
@@ -1158,7 +1158,7 @@ function LandingPage({ onLogin, onEmailSignUp, onEmailSignIn }: {
     if (err) setError(err);
   };
 
-  const bg = { background: 'linear-gradient(160deg, #7f1d1d 0%, #b91c1c 40%, #dc2626 70%, #ef4444 100%)' };
+  const bg = { background: 'linear-gradient(160deg, #1e3a8a 0%, #1d4ed8 40%, #2563eb 70%, #3b82f6 100%)' };
 
   if (mode === 'home') {
     return (
@@ -1716,7 +1716,7 @@ function OnboardingScreen({ user, onComplete }: {
 
   const roleStep = (
     <>
-      <div className="w-14 h-14 gradient-red rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-500/20">
+      <div className="w-14 h-14 gradient-red rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/20">
         <Sparkles className="w-7 h-7 text-white" />
       </div>
       <h2 className="font-display font-bold text-2xl text-brand-navy mb-1">Welcome to <span className="text-brand-gold">Li</span>nq</h2>
@@ -2648,7 +2648,7 @@ function LoyaltyCard({ card, store, onViewStore }: { card: Card, store?: StorePr
         onClick={() => !isCompleted && setShowQR(true)}
         className={cn(
           "glass-card p-6 rounded-[2.5rem] border relative overflow-hidden transition-all",
-          isCompleted ? "border-brand-gold/40 bg-red-50/60" : "border-transparent cursor-pointer"
+          isCompleted ? "border-brand-gold/40 bg-blue-50/60" : "border-transparent cursor-pointer"
         )}
       >
         <div className="absolute top-4 right-4 flex items-center gap-2">
@@ -2809,7 +2809,7 @@ function LoyaltyCard({ card, store, onViewStore }: { card: Card, store?: StorePr
               <h3 className="font-display text-3xl font-bold mb-2">Congratulations!</h3>
               <p className="text-brand-navy/60 mb-8">You've reached {limit} stamps at {store?.name}! Show this screen to the shop staff to claim your reward.</p>
               
-              <div className="bg-red-50/80 p-6 rounded-3xl mb-8 border-2 border-dashed border-brand-gold/40">
+              <div className="bg-blue-50/80 p-6 rounded-3xl mb-8 border-2 border-dashed border-brand-gold/40">
                 <p className="text-[10px] font-bold text-brand-gold uppercase tracking-widest mb-2">Staff Action Required</p>
                 <p className="text-sm font-bold text-brand-navy">Scan NFC Tag or Stamp again to confirm redemption</p>
               </div>
@@ -5555,7 +5555,7 @@ function CreatePostModal({ onClose, user, profile }: { onClose: () => void, user
           <button
             onClick={handleSubmit}
             disabled={isPosting || (!content.trim() && !isPoll) || (isPoll && pollOptions.filter(o => o.trim()).length < 2)}
-            className="px-6 py-2.5 gradient-red text-white rounded-xl font-bold text-sm disabled:opacity-40 transition-all active:scale-95 shadow-md shadow-red-500/20"
+            className="px-6 py-2.5 gradient-red text-white rounded-xl font-bold text-sm disabled:opacity-40 transition-all active:scale-95 shadow-md shadow-blue-500/20"
           >
             {isPosting ? 'Posting...' : 'Post'}
           </button>
